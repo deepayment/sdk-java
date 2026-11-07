@@ -510,6 +510,12 @@ public final class Client implements AutoCloseable {
             throw new DeepaymentException.Request("sdk: method code is required");
         }
 
+        if (Rules.AGGREGATE_PAYMENT_CODE.equals(code)) {
+            if (rules != Rules.PAYMENT_METHOD_RULES || currency == null || currency.trim().isEmpty() || Rules.AGGREGATE_PAYMENT_CODE.equalsIgnoreCase(currency.trim()) || method.size() != 1) {
+                throw new DeepaymentException.Request("sdk: aggregate is a code-only payment mode with a specific currency");
+            }
+            return;
+        }
         java.util.ArrayList<String> present = new java.util.ArrayList<String>();
         for (Map.Entry<String, Object> e : method.entrySet()) {
             if (!"code".equals(e.getKey()) && e.getValue() != null) {

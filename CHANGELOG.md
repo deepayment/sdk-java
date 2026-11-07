@@ -1,5 +1,9 @@
 # Changelog — java
 
+## v0.5.0 — 2026-11-07
+
+- Support code-only `ALL` payments through aggregate hosted checkout; preserve ordinary method validation and reject aggregate payouts.
+
 Versions follow SemVer. Tags are `vX.Y.Z` on this repository.
 
 ## v0.4.1 — 2026-10-28

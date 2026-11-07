@@ -11,6 +11,8 @@ import java.util.Map;
 final class Rules {
     private Rules() {}
 
+    static final String AGGREGATE_PAYMENT_CODE = "ALL";
+
     /** Top-level create-order field rules, from protocol/data/request-rules.json. */
     static final List<String> CREATE_REQUIRED_TEXT_FIELDS = Collections8.list("merchantOrderNo", "currency");
     static final String AMOUNT_PATTERN = "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,2})?$";

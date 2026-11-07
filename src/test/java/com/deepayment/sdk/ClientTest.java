@@ -343,6 +343,41 @@ class ClientTest {
         assertEquals("100.50", payload.get("amount"));
         assertEquals("100.50", payload.get("paidAmount"));
         assertFalse(payload.containsKey("payer"));
+        assertFalse(payload.containsKey("paymentMethod"));
+    }
+
+    @Test
+    void paymentWebhookPreservesAndSignsPaymentMethod() throws IOException {
+        for (List<String> scenario : Collections8.list(
+                Collections8.list("004-payment-method.json", "PSE", "SUCCEEDED"),
+                Collections8.list("005-payment-method-unselected.json", "ALL", "EXPIRED"))) {
+            JsonNode vector = load("webhook/" + scenario.get(0));
+            Client client = baseBuilder()
+                    .clock(() -> 1787803300L)
+                    .platformWebhookPublicKeys(Collections8.map(
+                            vector.get("key").get("platformWebhookKeyId").asText(),
+                            vector.get("key").get("platformWebhookPublicKeyBase64").asText()))
+                    .transport(transport(new Captured(), 200, envelopeJson("{}")))
+                    .build();
+            JsonNode input = vector.get("input");
+            String original = vector.get("body").asText();
+            Map<String, Object> payload = client.parsePaymentWebhook(input.get("method").asText(), input.get("path").asText(),
+                    hookHeaders(vector), original.getBytes(StandardCharsets.UTF_8), input.get("rawQuery").asText());
+            assertEquals(scenario.get(1), payload.get("paymentMethod"));
+            assertEquals(scenario.get(2), payload.get("status"));
+            for (boolean refreshDigest : new boolean[]{false, true}) {
+                byte[] body = original.replace("\"paymentMethod\":\"" + scenario.get(1) + "\"",
+                        "\"paymentMethod\":\"NEQUI\"").getBytes(StandardCharsets.UTF_8);
+                Map<String, String> headers = hookHeaders(vector);
+                if (refreshDigest) {
+                    headers.put("Content-Digest", Protocol.contentDigestSha256(body));
+                }
+                Class<? extends DeepaymentException> expectedError = refreshDigest
+                        ? DeepaymentException.InvalidSignature.class : DeepaymentException.Webhook.class;
+                assertThrows(expectedError, () -> client.parsePaymentWebhook(input.get("method").asText(),
+                        input.get("path").asText(), headers, body, input.get("rawQuery").asText()));
+            }
+        }
     }
 
     @Test
@@ -1033,4 +1068,27 @@ class ClientTest {
         }
     }
 
+
+    @Test
+    void aggregateValidationVectors() throws Exception {
+        for (JsonNode c : load("methods/002-aggregate.json")) {
+            Captured captured = new Captured();
+            Client client = baseBuilder().transport(transport(captured, 200,
+                    "{\"code\":200,\"msg\":\"OK\",\"data\":{}}".getBytes(StandardCharsets.UTF_8))).build();
+            Map<String, Object> req = new HashMap<>();
+            req.put("merchantOrderNo", "aggregate-vector");
+            req.put("currency", c.get("currency").asText());
+            req.put("amount", "10.00");
+            req.put("webhookUrl", "https://merchant.example.com/webhook");
+            boolean payment = c.get("direction").asText().equals("payment");
+            req.put(payment ? "paymentMethod" : "payoutMethod", MAPPER.convertValue(c.get("method"), new TypeReference<Map<String, Object>>() {}));
+            if (c.get("valid").asBoolean()) {
+                if (payment) client.createPayment(req); else client.createPayout(req);
+                assertTrue(captured.body != null, c.get("name").asText());
+            } else {
+                assertThrows(DeepaymentException.Request.class, () -> { if (payment) client.createPayment(req); else client.createPayout(req); });
+                assertNull(captured.body, "invalid request must not reach transport");
+            }
+        }
+    }
 }

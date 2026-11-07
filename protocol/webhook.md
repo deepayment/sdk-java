@@ -67,6 +67,7 @@ Deduplicate by `eventId` and apply business effects idempotently to the verified
   "merchantOrderNo": "…",
   "status": "SUCCEEDED",
   "currency": "BRL",
+  "paymentMethod": "PIX",
   "amount": "100.50",
   "paidAmount": "100.50",
   "channelTradeNo": "…",
@@ -81,6 +82,20 @@ Amounts are decimal strings. `failure` is present when `status` is `FAILED`; bra
 `failure.msg`, use `failure.message` for display only.
 
 Fixed vectors: [`testdata/webhook/`](./testdata/webhook/).
+
+Payment events include the optional string `paymentMethod`, using the same code
+as the authenticated payment query. Ordinary orders retain their method; an
+aggregate order created with `ALL` reports its committed selection, such as `PSE`
+or `PIX`, once payment preparation has completed. `ALL` means no actual method
+has been committed, including expiry or cancellation before selection and failed
+preparation. It is not a payment rail and must not be counted as a paid method.
+
+The method is frozen with the first event body and covered by its signature.
+Existing events without this field remain unchanged on retry; use the
+authenticated query to retrieve their current method. Consumers must accept a
+missing field for older events. Go and Python consumers need an SDK version that
+exposes the field, or can read it from the verified raw payload. Payout webhook
+payloads are unchanged.
 
 Payment webhooks may include `payer.name` and `payer.documentNumber` from the
 channel-reported actual payer, never copied from the create request. Unavailable

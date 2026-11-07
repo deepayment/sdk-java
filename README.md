@@ -28,14 +28,14 @@ Maven:
 <dependency>
   <groupId>com.deepayment</groupId>
   <artifactId>sdk</artifactId>
-  <version>0.4.1</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```
-implementation("com.deepayment:sdk:0.4.1")
+implementation("com.deepayment:sdk:0.5.0")
 ```
 
 Runtime dependencies: Bouncy Castle 1.86, Jackson 2.17.2 and Apache HttpClient 5.6.5. The default HTTP transport disables automatic retries, redirects, cookies and decompression; custom transports remain supported. Java 8 or newer. Java 8, 11, 17 and 21 are covered by the test matrix.
@@ -176,3 +176,18 @@ Reuse one `Client` for the merchant's requests and call `client.close()` at appl
 The default pool permits 50 connections in total and per route. Set `Client.builder().maxConnections(value)` to a positive limit for your workload; this setting does not affect an injected transport. Requests above the limit wait for a connection and may time out with an unknown outcome.
 
 The Java timeout limits connection-pool acquisition, connection establishment and response read inactivity separately; it is not a whole-request deadline. A timeout leaves the business outcome unknown: query the original order before retrying.
+
+## Aggregate hosted checkout
+
+Create a payment through the existing payment endpoint with a specific `currency`
+and `paymentMethod: {"code":"ALL"}`. Do not include method-specific payloads.
+The payer selects an available method and provides any required payer details on
+`action.url`. Availability depends on the merchant configuration and enabled
+payment capabilities; an SDK rule does not imply that a currency is enabled.
+
+Keep the complete `action.url`, including its fragment. Treat it as a private
+checkout link. Queries keep returning that entry URL after selection, while the
+order's payment method changes from `ALL` to the selected method. A successful
+create or browser return does not prove payment: verify the signed webhook or
+query the order. On timeout, query or retry with the same merchant order number
+and unchanged business fields. `ALL` is unavailable for payouts and subscriptions.
